@@ -1,18 +1,48 @@
-import { NativeText } from "@/components/Global/NativeComponents";
-import PapillonSpinner from "@/components/Global/PapillonSpinner";
 import defaultPersonalization from "@/services/local/default-personalization";
 import { useAccounts, useCurrentAccount } from "@/stores/account";
-import { AccountService, LocalAccount } from "@/stores/account/types";
+import { AccountService, Identity, LocalAccount } from "@/stores/account/types";
 import uuid from "@/utils/uuid-v4";
 import { useTheme } from "@react-navigation/native";
 import React from "react";
-import { Alert, Button, View } from "react-native";
+import { Alert, View } from "react-native";
 import { WebView } from "react-native-webview";
 import type { Screen } from "@/router/helpers/types";
+import PapillonSpinner from "@/components/Global/PapillonSpinner";
+import { NativeText } from "@/components/Global/NativeComponents";
+import { animPapillon } from "@/utils/ui/animations";
+import { FadeInDown, FadeOutUp } from "react-native-reanimated";
+
+const providers = ["scodoc", "moodle", "ical"];
 
 const capitalizeFirst = (str: string) => {
   str = str.toLowerCase();
   return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+const buildIdentity = (data: any): Partial<Identity> => {
+  return {
+    firstName: capitalizeFirst(data["relevé"].etudiant.prenom || ""),
+    lastName: (data["relevé"].etudiant.nom || "").toUpperCase(),
+    civility: data["relevé"].etudiant.civilite || undefined,
+    boursier: data["relevé"].etudiant.boursier || false,
+    ine: data["relevé"].etudiant.code_ine || undefined,
+    birthDate: data["relevé"].etudiant.date_naissance
+      ? new Date(data["relevé"].etudiant.date_naissance.split("/").reverse().join("-"))
+      : undefined,
+    birthPlace: data["relevé"].etudiant.lieu_naissance || undefined,
+    phone: [
+      data["relevé"].etudiant.telephonemobile ? (data["relevé"].etudiant.telephonemobile).replaceAll(".", " ") : undefined,
+    ],
+    email: [
+      data["relevé"].etudiant.email || undefined,
+      data["relevé"].etudiant.emailperso || undefined,
+    ],
+    address: {
+      street: data["relevé"].etudiant.domicile || undefined,
+      city: data["relevé"].etudiant.villedomicile || undefined,
+      zipCode: data["relevé"].etudiant.codepostaldomicile || undefined,
+    },
+  };
 };
 
 const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigation }) => {
@@ -25,6 +55,8 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
   const url = "https://notes9.iutlan.univ-rennes1.fr/";
   const firstLogin = params?.firstLogin || false;
   const theme = useTheme();
+
+  const [step, setStep] = React.useState("Chargement du portail");
 
   if(!firstLogin) {
     if(account?.service == AccountService.Local && account.credentials) {
@@ -51,14 +83,87 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
         rawData: data,
       });
 
+      // @ts-ignore
+      mutateProperty("providers", providers);
+      mutateProperty("identity", buildIdentity(data));
+
+      retreiveGrades(data);
+    }
+  };
+
+  const [semestresToRetrieve, setSemestresToRetrieve] = React.useState<any[]>([]);
+  const [currentSemestre, setCurrentSemestre] = React.useState(0);
+
+  const retreiveGrades = async (data: any) => {
+    setStep("Récupération des notes");
+
+    try {
+      const scodocData = data;
+      const semestres = (scodocData["semestres"] as any);
+
+      setSemestresToRetrieve(semestres);
+      await retreiveNextSemestre(currentSemestre, semestres);
+    }
+    catch (e) {
+      console.error(e);
+      Alert.alert(
+        "Erreur",
+        "Impossible de récupérer les notes de l'IUT de Lannion. Vérifie ta connexion internet et réessaye.",
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
       navigation.goBack();
     }
   };
 
-  const actionFirstLogin = async (data: any) => {
-    console.log("First login");
-    console.log(data);
+  const retreiveNextSemestre = async (cs: number, semestres: any[] = semestresToRetrieve) => {
+    const sem = semestres[cs];
+    console.log(sem);
+    setStep("Récupération du semestre " + sem.semestre_id);
+    wbref.current?.injectJavaScript(`
+      window.location.href = "https://notes9.iutlan.univ-rennes1.fr/services/data.php?q=relev%C3%A9Etudiant&semestre=" + ${sem.formsemestre_id};
+    `);
+  };
 
+  const processSemestre = async (data: any) => {
+    // ajouter le semestre ici
+    const newServiceData = account?.serviceData || {};
+
+    if (!newServiceData["semestres"]) {
+      newServiceData["semestres"] = {};
+    }
+
+    const semesterName = "Semestre " + semestresToRetrieve[currentSemestre].semestre_id;
+    console.log(semesterName);
+
+    newServiceData["semestres"][semesterName] = data;
+    mutateProperty("serviceData", newServiceData);
+
+    // passer au prochain semestre
+    const newCurrentSemestre = currentSemestre + 1;
+    setCurrentSemestre(newCurrentSemestre);
+
+    if (newCurrentSemestre < semestresToRetrieve.length) {
+      await retreiveNextSemestre(newCurrentSemestre, semestresToRetrieve);
+    }
+    else {
+      if(firstLogin) {
+        queueMicrotask(() => {
+          // Reset the navigation stack to the "Home" screen.
+          // Prevents the user from going back to the login screen.
+          navigation.goBack();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "AccountCreated" }],
+          });
+        });
+      }
+      else {
+        navigation.goBack();
+      }
+    }
+  };
+
+  const actionFirstLogin = async (data: any) => {
     const local_account: LocalAccount = {
       authentication: undefined,
       instance: undefined,
@@ -68,6 +173,10 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
         name: "IUT de Lannion",
         rawData: data,
       },
+
+      providers: providers,
+
+      identity: buildIdentity(data),
 
       credentials: {
         username: username || "",
@@ -94,15 +203,7 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
     createStoredAccount(local_account);
     switchTo(local_account);
 
-    queueMicrotask(() => {
-      // Reset the navigation stack to the "Home" screen.
-      // Prevents the user from going back to the login screen.
-      navigation.goBack();
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "AccountCreated" }],
-      });
-    });
+    retreiveGrades(data);
   };
 
   const wbref = React.useRef<WebView>(null);
@@ -114,12 +215,14 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
     if(redirectCount >= 2) {
       Alert.alert(
         "Erreur",
-        "Impossible de se connecter au portail de l'IUT de Lannion. Vérifiez vos identifiants et réessayez.",
+        "Impossible de se connecter au portail de l'IUT de Lannion. Vérifie tes identifiants et réessaye.",
         [{ text: "OK", onPress: () => navigation.goBack() }]
       );
       navigation.goBack();
       return;
     }
+
+    setStep("Connexion à Sésame");
 
     const newRedirCount = redirectCount + 1;
     setRedirectCount(newRedirCount);
@@ -136,6 +239,7 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
   };
 
   const redirectToData = () => {
+    setStep("Récupération des données");
     wbref.current?.injectJavaScript(`
               window.location.href = "https://notes9.iutlan.univ-rennes1.fr/services/data.php?q=dataPremièreConnexion";
             `);
@@ -159,10 +263,14 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
           gap: 6,
         }}
       >
-        <PapillonSpinner size={56} strokeWidth={5} />
+        <PapillonSpinner size={56} strokeWidth={5} color={theme.colors.primary} />
         <View style={{ height: 10 }} />
-        <NativeText variant="title">
-          En attente du portail
+        <NativeText variant="title" key={step}
+          animated
+          entering={animPapillon(FadeInDown)}
+          exiting={animPapillon(FadeOutUp)}
+        >
+          {step}
         </NativeText>
         <NativeText variant="subtitle">
           Cela peut prendre quelques secondes...
@@ -179,7 +287,7 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
           const url = data.nativeEvent.url;
           console.log(url);
 
-          if(url.startsWith("https://sso-cas.univ-rennes1.fr//login?")) {
+          if(url.startsWith("https://sso-cas.univ-rennes.fr//login?")) {
             injectPassword();
           }
 
@@ -188,17 +296,40 @@ const BackgroundIUTLannion: Screen<"BackgroundIUTLannion"> = ({ route, navigatio
             setCanExtractJSON(false);
           }
 
-          if(url.startsWith("https://notes9.iutlan.univ-rennes1.fr/services/data.php")) {
+          if(url.startsWith("https://notes9.iutlan.univ-rennes1.fr/services/data.php?q=relev%C3%A9Etudiant&semestre=")) {
             wbref.current?.injectJavaScript(`
-                window.ReactNativeWebView.postMessage(document.body.innerText);
-              `);
+              window.ReactNativeWebView.postMessage("semestre:"+document.body.innerText);
+            `);
           }
+          else if(url.startsWith("https://notes9.iutlan.univ-rennes1.fr/services/data.php")) {
+            wbref.current?.injectJavaScript(`
+              window.ReactNativeWebView.postMessage("firstLogin:"+document.body.innerText);
+            `);
+          }
+        }}
+
+        onError={(data) => {
+          console.error(data);
+          Alert.alert(
+            "Erreur",
+            "Impossible de se connecter au portail de l'IUT de Lannion. Vérifie ta connexion internet et réessaye.",
+            [{ text: "OK", onPress: () => navigation.goBack() }]
+          );
+          navigation.goBack();
         }}
 
         onMessage={(event) => {
           try {
-            const parsedData = JSON.parse(event.nativeEvent.data);
-            useData(parsedData);
+            if(event.nativeEvent.data.startsWith("firstLogin:")) {
+              const data = event.nativeEvent.data.replace("firstLogin:", "");
+              const parsedData = JSON.parse(data);
+              useData(parsedData);
+            }
+            else if(event.nativeEvent.data.startsWith("semestre:")) {
+              const data = event.nativeEvent.data.replace("semestre:", "");
+              const parsedData = JSON.parse(data);
+              processSemestre(parsedData);
+            }
           }
           catch (e) {
             console.error(e);

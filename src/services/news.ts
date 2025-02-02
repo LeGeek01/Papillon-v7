@@ -4,7 +4,6 @@ import type { Information } from "./shared/Information";
 import { checkIfSkoSupported } from "./skolengo/default-personalization";
 import { error } from "@/utils/logger/logger";
 import { newsRead } from "pawnote";
-import { ca } from "date-fns/locale";
 
 /**
  * Updates the state and cache for the news.
@@ -62,8 +61,12 @@ export async function setNewsRead <T extends Account> (account: T, message: Info
       await newsRead(account.instance, message.ref, read);
       break;
     }
-    case AccountService.Local:
-    case AccountService.EcoleDirecte:
+    case AccountService.Local: {
+      break;
+    }
+    case AccountService.EcoleDirecte: {
+      break;
+    }
     case AccountService.Multi:
       break;
     default: {

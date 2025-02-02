@@ -3,7 +3,6 @@ import type { Period } from "@/services/shared/Period";
 import  {
   type AverageOverview,
   type Grade,
-  GradeInformation,
   type GradeValue,
 } from "@/services/shared/Grade";
 import ecoledirecte, {
@@ -22,44 +21,31 @@ const decodePeriod = (p: PawdirectePeriod): Period => {
   };
 };
 
-const decodeGradeKind = (kind: GradeKind): GradeInformation | undefined => {
-  switch (kind) {
-    case GradeKind.Error:
-    case GradeKind.Grade:
-      return undefined;
-    case GradeKind.Absent:
-      return GradeInformation.Absent;
-    case GradeKind.Exempted:
-      return GradeInformation.Exempted;
-    case GradeKind.NotGraded:
-      return GradeInformation.NotGraded;
-    default:
-      return undefined;
-  }
-};
-
 const decodeGradeValue = (
   value: ecoledirecte.GradeValue | undefined,
 ): GradeValue => {
-  if (!value)
-    return {
-      disabled: true,
-      information: GradeInformation.NotGraded,
-      value: 0,
-    };
+  if (typeof value === "undefined")
+    return { value: null, disabled: true, status: null };
 
-  return {
-    disabled: value.kind === GradeKind.Error,
-    information: decodeGradeKind(value.kind),
-    value: value?.points,
-  };
+  switch (value.kind) {
+    case GradeKind.Grade:
+      return { value: value.points ?? 0, disabled: false, status: null };
+    case GradeKind.Absent:
+      return { value: value.points ?? 0, disabled: true, status: "Abs" };
+    case GradeKind.Exempted:
+      return { value: value.points ?? 0, disabled: true, status: "Disp" };
+    case GradeKind.NotGraded:
+      return { value: value.points ?? 0, disabled: true, status: "N. Not" };
+    default:
+      return { value: value.points ?? 0, disabled: true, status: null };
+  }
 };
 
 const getGradeValue = (value: number | string | undefined): GradeValue => {
   return {
     disabled: false,
     value: value ? Number(value) : 0,
-    information: undefined,
+    status: null,
   };
 };
 
@@ -136,7 +122,7 @@ export const getGradesAndAverages = async (
         isOptional: g.isOptional,
 
         outOf: getGradeValue(g.outOf),
-        coefficient: g.coefficient,
+        coefficient: g.coefficient ?? 1,
 
         student: decodeGradeValue(g.value),
         average: decodeGradeValue(g.average),

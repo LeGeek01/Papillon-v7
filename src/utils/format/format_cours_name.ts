@@ -54,7 +54,7 @@ function findObjectByPronoteString (pronoteString = "") {
 }
 
 function formatPretty (text: string): string {
-  const upperCaseTerms = ["CM", "TD", "TP", "LV1", "LV2", "LV3", "SAE", "PPP"];
+  const upperCaseTerms = ["CM", "TD", "TP", "LV1", "LV2", "LV3", "LVA", "LVB", "LVC", "SAE", "PPP"];
   let words = text.split(" ");
   words = words.map(word => {
     if (upperCaseTerms.includes(word.toUpperCase())) {
@@ -76,6 +76,7 @@ function getCourseSpeciality (pronoteString = ""): string | null {
   newPrnString = newPrnString.replace("expression", "expr.");
   newPrnString = newPrnString.replace("compréhension", "comp.");
   newPrnString = newPrnString.replace("ecrit", "écrit");
+  newPrnString = newPrnString.replace("sae", "saé");
   newPrnString = formatPretty(newPrnString);
 
   return newPrnString;

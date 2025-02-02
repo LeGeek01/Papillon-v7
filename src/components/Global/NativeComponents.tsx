@@ -1,9 +1,10 @@
 import React, { type ReactNode, isValidElement, Children } from "react";
 import { View, Text, Pressable, StyleSheet, type StyleProp, type ViewStyle, type TextStyle, Platform, TouchableNativeFeedback } from "react-native";
-import Reanimated, { type AnimatedProps, LinearTransition } from "react-native-reanimated";
+import Reanimated, { type AnimatedProps, LayoutAnimation, LinearTransition } from "react-native-reanimated";
 import { useTheme } from "@react-navigation/native";
 import { ChevronRight } from "lucide-react-native";
 import { animPapillon } from "@/utils/ui/animations";
+import { LinearGradient } from "expo-linear-gradient";
 
 /**
  * Pour une raison quelconque, Reanimated n'epxose
@@ -17,6 +18,7 @@ interface NativeListProps {
   style?: StyleProp<ViewStyle>;
   inline?: boolean;
   animated?: boolean;
+  layout?: LayoutAnimation;
   entering?: EntryOrExitLayoutType;
   exiting?: EntryOrExitLayoutType;
 }
@@ -26,6 +28,7 @@ export const NativeList: React.FC<NativeListProps> = ({
   style,
   inline,
   animated,
+  layout,
   entering,
   exiting
 }) => {
@@ -42,7 +45,7 @@ export const NativeList: React.FC<NativeListProps> = ({
     return (
       <Reanimated.View
         style={list_styles.item}
-        layout={animated && animPapillon(LinearTransition)}
+        layout={animated && (layout ?? animPapillon(LinearTransition))}
         key={newChild.props.identifier || null}
       >
         {newChild}
@@ -344,6 +347,36 @@ export const NativeIcon: React.FC<NativeIconProps> = ({ icon, color, style }) =>
         color: "#FFFFFF",
       })}
     </View>
+  );
+};
+
+interface NativeIconGradientprops {
+  icon: ReactNode;
+  colors?: string[];
+  locations?: number[];
+  style?: StyleProp<ViewStyle>;
+}
+
+export const NativeIconGradient: React.FC<NativeIconGradientprops> = ({ icon, colors, locations, style }) => {
+  return (
+    <LinearGradient
+      colors={colors || ["#000", "#000"]}
+      locations={locations || [0, 1]}
+      style={[{
+        backgroundColor: "#000",
+        borderRadius: 9,
+        width: 36,
+        height: 36,
+        justifyContent: "center",
+        alignItems: "center",
+      }, style]}
+    >
+      {React.cloneElement(icon as React.ReactElement<any>, {
+        size: 22,
+        strokeWidth: 2.4,
+        color: "#FFFFFF",
+      })}
+    </LinearGradient>
   );
 };
 

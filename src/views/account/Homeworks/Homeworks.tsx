@@ -2,36 +2,33 @@ import { NativeList, NativeListHeader } from "@/components/Global/NativeComponen
 import { useCurrentAccount } from "@/stores/account";
 import { useHomeworkStore } from "@/stores/homework";
 import { useTheme } from "@react-navigation/native";
-import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import { toggleHomeworkState, updateHomeworkForWeekInCache } from "@/services/homework";
 import {
   View,
-  Text,
   FlatList,
   Dimensions,
-  Button,
   ScrollView,
   RefreshControl,
   StyleSheet,
-  ActivityIndicator,
   TextInput,
   ListRenderItem
 } from "react-native";
 import { dateToEpochWeekNumber, epochWNToDate } from "@/utils/epochWeekNumber";
 
-import HomeworksNoHomeworksItem from "./Atoms/NoHomeworks";
+import * as StoreReview from "expo-store-review";
+
 import HomeworkItem from "./Atoms/Item";
 import { PressableScale } from "react-native-pressable-scale";
 import { TouchableOpacity } from "react-native-gesture-handler";
-import { Book, Check, CheckCircle, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, CircleDashed, CircleDotDashed, Search, X } from "lucide-react-native";
+import { Book, CheckSquare, ChevronLeft, ChevronRight, CircleDashed, Search, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 
-import Reanimated, { Easing, FadeIn, FadeInLeft, FadeInRight, FadeInUp, FadeOut, FadeOutDown, FadeOutLeft, FadeOutRight, FadeOutUp, LinearTransition, ZoomIn, ZoomOut } from "react-native-reanimated";
+import Reanimated, { Easing, FadeIn, FadeInLeft, FadeInUp, FadeOut, FadeOutDown, FadeOutLeft, LinearTransition, ZoomIn, ZoomOut } from "react-native-reanimated";
 import { animPapillon } from "@/utils/ui/animations";
 import PapillonSpinner from "@/components/Global/PapillonSpinner";
 import AnimatedNumber from "@/components/Global/AnimatedNumber";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import MissingItem from "@/components/Global/MissingItem";
 import { PapillonModernHeader } from "@/components/Global/PapillonModernHeader";
@@ -40,7 +37,7 @@ import {Account} from "@/stores/account/types";
 import {Screen} from "@/router/helpers/types";
 import {NativeSyntheticEvent} from "react-native/Libraries/Types/CoreEventTypes";
 import {NativeScrollEvent, ScrollViewProps} from "react-native/Libraries/Components/ScrollView/ScrollView";
-import {SearchBar} from "react-native-screens";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type HomeworksPageProps = {
   index: number;
@@ -135,10 +132,8 @@ const WeekView: Screen<"Homeworks"> = ({ route, navigation }) => {
     if (showLoading) {
       setLoading(true);
     }
-    console.log("[Homeworks]: updating cache...", selectedWeek, epochWNToDate(selectedWeek));
     updateHomeworkForWeekInCache(account, epochWNToDate(selectedWeek))
       .then(() => {
-        console.log("[Homeworks]: updated cache !", epochWNToDate(selectedWeek));
         setLoading(false);
         setRefreshing(false);
         setLoadedWeeks(prev => [...prev, selectedWeek]);
@@ -192,6 +187,14 @@ const WeekView: Screen<"Homeworks"> = ({ route, navigation }) => {
         acc[day] = acc[day].filter(homework => !homework.done);
       }
 
+      // homework completed downstairs
+      acc[day] = acc[day].sort((a, b) => {
+        if (a.done === b.done) {
+          return 0; // if both have the same status, keep the original order
+        }
+        return a.done ? 1 : -1; // completed go after
+      });
+
       // remove all empty days
       if (acc[day].length === 0) {
         delete acc[day];
@@ -200,16 +203,37 @@ const WeekView: Screen<"Homeworks"> = ({ route, navigation }) => {
       return acc;
     }, {} as Record<string, Homework[]>);
 
-    // Moved completed homework to the bottom of the day
-    const sortedGroupedHomework = Object.keys(groupedHomework).reduce((acc, day) => {
-      acc[day] = groupedHomework[day].sort((a, b) => {
-        if (a.done === b.done) {
-          return 0; // Keep the current order if both are either completed or not completed
+    const askForReview = async () => {
+      StoreReview.isAvailableAsync().then((available) => {
+        if (available) {
+          StoreReview.requestReview();
         }
-        return a.done ? 1 : -1; // Unfinished at the top, finished at the bottom
       });
-      return acc;
-    }, {} as Record<string, Homework[]>);
+    };
+
+    const countCheckForReview = async () => {
+      AsyncStorage.getItem("review_checkedHomeworkCount").then((value) => {
+        if (value) {
+          if (parseInt(value) >= 5) {
+            AsyncStorage.setItem("review_checkedHomeworkCount", "0");
+
+            setTimeout(() => {
+              AsyncStorage.getItem("review_given").then((value) => {
+                if(!value) {
+                  askForReview();
+                  AsyncStorage.setItem("review_given", "true");
+                }
+              });
+            }, 1000);
+          }
+          else {
+            AsyncStorage.setItem("review_checkedHomeworkCount", (parseInt(value) + 1).toString());
+          }
+        } else {
+          AsyncStorage.setItem("review_checkedHomeworkCount", "1");
+        }
+      });
+    };
 
     return (
       <ScrollView
@@ -247,6 +271,7 @@ const WeekView: Screen<"Homeworks"> = ({ route, navigation }) => {
                   onDonePressHandler={async () => {
                     await toggleHomeworkState(account, homework);
                     await updateHomeworks(true, false, false);
+                    await countCheckForReview();
                   }}
                 />
               ))}
@@ -267,7 +292,7 @@ const WeekView: Screen<"Homeworks"> = ({ route, navigation }) => {
               <MissingItem
                 emoji="🔍"
                 title="Aucun résultat"
-                description="Aucun devoir ne correspond à votre recherche."
+                description="Aucun devoir ne correspond à ta recherche."
               />
               :
               hideDone ?

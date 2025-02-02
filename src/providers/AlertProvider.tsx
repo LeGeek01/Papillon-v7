@@ -3,19 +3,23 @@ import { Check } from "lucide-react-native";
 import React, { createContext, useState, useContext, ReactNode } from "react";
 import { Modal, View, Text, StyleSheet, Dimensions, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Reanimated, { LinearTransition, FadeInDown, FadeOutDown } from "react-native-reanimated";
+import Reanimated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
+import { PapillonContextEnter, PapillonContextExit } from "@/utils/ui/animations";
+import { BlurView } from "expo-blur";
 
 type AlertAction = {
   title: string;
-  onPress: () => void;
+  onPress?: () => void;
   icon?: React.ReactElement;
   primary?: boolean;
+  danger?: boolean;
   backgroundColor?: string;
 };
 
 export type Alert = {
   title: string;
   message: string;
+  icon? : React.ReactElement | null;
   actions?: AlertAction[];
 };
 
@@ -38,7 +42,7 @@ type AlertProviderProps = {
 };
 
 const AlertProvider = ({ children }: AlertProviderProps) => {
-  const [alert, setAlert] = useState<Alert>({ title: "", message: "", actions: [] });
+  const [alert, setAlert] = useState<Alert>({ title: "", message: "", icon: null, actions: [] });
   const [visible, setVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -48,6 +52,7 @@ const AlertProvider = ({ children }: AlertProviderProps) => {
   const showAlert = ({
     title = "",
     message = "",
+    icon = null,
     actions = [
       {
         title: "Compris !",
@@ -85,7 +90,7 @@ const AlertProvider = ({ children }: AlertProviderProps) => {
     setVisible(true);
     setModalVisible(true);
 
-    setAlert({ title, message, actions });
+    setAlert({ title, message, icon, actions });
   };
 
   const hideAlert = () => {
@@ -97,6 +102,10 @@ const AlertProvider = ({ children }: AlertProviderProps) => {
     }, 100);
   };
 
+  const finalIcon = alert.icon ?
+    React.cloneElement(alert.icon, { color: colors.text, size: 24 }) :
+    null;
+
   return (
     <AlertContext.Provider value={{ showAlert }}>
       {children}
@@ -105,8 +114,36 @@ const AlertProvider = ({ children }: AlertProviderProps) => {
         transparent={true}
         visible={modalVisible}
         onRequestClose={hideAlert}
-        animationType="fade"
+        animationType="none"
       >
+        {visible && (
+          <Reanimated.View
+            entering={FadeIn.duration(150)}
+            exiting={FadeOut.duration(150)}
+            style={{
+              zIndex: -199,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+            }}
+            pointerEvents={"none"}
+          >
+            <BlurView
+              intensity={10}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+              }}
+            />
+          </Reanimated.View>
+        )}
+
         <Reanimated.View
           style={styles.modalContainer}
           layout={LinearTransition}
@@ -125,15 +162,20 @@ const AlertProvider = ({ children }: AlertProviderProps) => {
                   backgroundColor: colors.card,
                   marginBottom: 10 + insets.bottom,
                   width: Dimensions.get("window").width - 20,
+                  maxWidth: 600,
+                  transformOrigin: "bottom",
                 }
               ]}
-              entering={FadeInDown.duration(200)}
-              exiting={FadeOutDown.duration(100)}
+              entering={PapillonContextEnter}
+              exiting={PapillonContextExit}
             >
               <View style={styles.contentContainer}>
-                <Text style={[styles.title, { color: colors.text }]}>
-                  {alert.title}
-                </Text>
+                <View style={[styles.titleContainer]}>
+                  {finalIcon}
+                  <Text style={[styles.title, { color: colors.text }]}>
+                    {alert.title}
+                  </Text>
+                </View>
 
                 <Text style={[styles.message, { color: colors.text }]}>
                   {alert.message}
@@ -141,11 +183,11 @@ const AlertProvider = ({ children }: AlertProviderProps) => {
               </View>
 
               <View style={[styles.buttons, { borderColor: colors.border, backgroundColor: colors.text + "0a" }]}>
-                {(alert.actions ?? []).map(({ title, onPress, icon, primary, backgroundColor }) => (
+                {(alert.actions ?? []).map(({ title, onPress, icon, primary, danger, backgroundColor }) => (
                   <Pressable
                     key={title}
                     onPress={() => {
-                      onPress();
+                      onPress?.();
                       hideAlert();
                     }}
                     style={({ pressed }) => [
@@ -153,6 +195,9 @@ const AlertProvider = ({ children }: AlertProviderProps) => {
                       primary && styles.primaryButton,
                       primary && {
                         backgroundColor: backgroundColor ? backgroundColor : colors.primary,
+                      },
+                      danger && {
+                        backgroundColor: "#b62000",
                       },
                       {
                         opacity: primary ? (pressed ? 0.6 : 1) : (pressed ? 0.3 : 0.6),
@@ -180,7 +225,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0)",
   },
 
   alertBox: {
@@ -200,6 +245,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 0,
     gap: 6,
+  },
+
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
 
   title: {

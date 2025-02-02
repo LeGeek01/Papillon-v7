@@ -1,5 +1,5 @@
 import { useTheme } from "@react-navigation/native";
-import { CheckSquare } from "lucide-react-native";
+import { FileCheck } from "lucide-react-native";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo } from "react";
 import { Text, View } from "react-native";
 import Reanimated, { LinearTransition } from "react-native-reanimated";
@@ -80,7 +80,7 @@ const LastGradeWidget = forwardRef(({
           opacity: 0.5,
         }}
       >
-        <CheckSquare size={20} color={colors.text} />
+        <FileCheck size={20} color={colors.text} />
         <Text
           style={{
             color: colors.text,
@@ -108,6 +108,10 @@ const LastGradeWidget = forwardRef(({
             backgroundColor: subjectColor + "22",
             borderRadius: 50,
             padding: 6,
+            width: 40,
+            height: 40,
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
           <Text style={{ fontSize: 18 }}>{subjectEmoji}</Text>

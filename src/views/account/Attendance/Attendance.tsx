@@ -1,6 +1,6 @@
 import { useTheme } from "@react-navigation/native";
 import { useEffect, useMemo, useState } from "react";
-import { View, ActivityIndicator, Platform } from "react-native";
+import { View, ActivityIndicator, Platform, RefreshControl } from "react-native";
 
 import type { Screen } from "@/router/helpers/types";
 import { useCurrentAccount } from "@/stores/account";
@@ -19,6 +19,7 @@ import InsetsBottomView from "@/components/Global/InsetsBottomView";
 import { protectScreenComponent } from "@/router/helpers/protected-screen";
 import { Observation } from "@/services/shared/Observation";
 import MissingItem from "@/components/Global/MissingItem";
+import React from "react";
 
 const Attendance: Screen<"Attendance"> = ({ route, navigation }) => {
   const theme = useTheme();
@@ -30,7 +31,7 @@ const Attendance: Screen<"Attendance"> = ({ route, navigation }) => {
 
 
 
-  const [isRefreshing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setLoading] = useState(true);
 
   const [userSelectedPeriod, setUserSelectedPeriod] = useState<string | null>(null);
@@ -39,6 +40,10 @@ const Attendance: Screen<"Attendance"> = ({ route, navigation }) => {
   useEffect(() => {
     updateAttendancePeriodsInCache(account);
   }, [navigation, account.instance]);
+
+  useEffect(() => {
+    setIsRefreshing(false);
+  }, [attendances]);
 
   useEffect(() => {
     void async function () {
@@ -221,11 +226,26 @@ const Attendance: Screen<"Attendance"> = ({ route, navigation }) => {
           padding: 16,
           paddingTop: 0,
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => {
+              setIsRefreshing(true);
+              if(account.identityProvider?.identifier) {
+                navigation.navigate("BackgroundIdentityProvider");
+                updateAttendanceInCache(account, selectedPeriod).then(() => setIsRefreshing(false));
+              }
+              else {
+                updateAttendanceInCache(account, selectedPeriod).then(() => setIsRefreshing(false));
+              }
+            }}
+          />
+        }
       >
         {attendances[selectedPeriod] && attendances[selectedPeriod].absences.length === 0 && attendances[selectedPeriod].delays.length === 0 && attendances[selectedPeriod].punishments.length === 0 && Object.keys(attendances_observations_details).length === 0 &&(
           <MissingItem
             title="Aucune absence"
-            description="Vous n'avez pas d'absences ni de retards pour cette période."
+            description="Tu n'as pas d'absences ni de retards pour cette période."
             emoji="🎉"
             style={{ marginTop: 16 }}
           />

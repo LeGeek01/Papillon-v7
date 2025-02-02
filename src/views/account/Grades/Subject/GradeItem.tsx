@@ -36,7 +36,7 @@ const GradeItem: React.FC<GradeItemProps> = ({
   });
 
   const gradeValue =
-		typeof grade.student.value === "number"
+		(typeof grade.student.value === "number" && !isNaN(grade.student.value))
 		  ? grade.student.value.toFixed(2)
 		  : "N. not";
 
@@ -85,7 +85,7 @@ const GradeItem: React.FC<GradeItemProps> = ({
         <View style={styles.rightContent}>
           <NativeText style={styles.gradeValue}>{gradeValue}</NativeText>
           <NativeText style={styles.maxGrade}>
-            /{grade.outOf.value?.toFixed(0) ?? "??"}
+            /{grade.outOf.value ?? "??"}
           </NativeText>
         </View>
       </View>

@@ -1,12 +1,14 @@
 import type pronote from "pawnote";
 import type { Account as PawdirecteAccount, Session as PawdirecteSession } from "pawdirecte";
-import type { Client as ARDClient, Client as PawrdClient } from "pawrd";
+import type { Client as ARDClient } from "pawrd";
 import { Client as TurboselfClient } from "turboself-api";
+import { Client as AliseClient, BookingDay } from "alise-api";
 import type ScolengoAPI from "scolengo-api";
 import {Configuration, Identification} from "ezly";
 import type MultiAPI from "esup-multi.js";
 import { SkolengoAuthConfig } from "@/services/skolengo/skolengo-types";
 import { User as ScolengoAPIUser } from "scolengo-api/types/models/Common";
+import {OnlinePayments} from "pawrd/dist";
 
 export interface Tab {
   name: string
@@ -38,12 +40,21 @@ export interface Personalization {
   hideProfilePicOnHomeScreen: boolean,
   hideTabTitles: boolean,
   showTabBackground: boolean,
+  showWeekFrequency: boolean,
   transparentTabBar: boolean,
   hideTabBar: boolean,
   popupRestauration?: boolean,
   magicEnabled?: boolean,
   MagicNews?: boolean,
   MagicHomeworks?: boolean,
+  notifications?: {
+    enabled?: boolean
+    news?: boolean
+    homeworks?: boolean
+    grades?: boolean
+    timetable?: boolean
+    attendance?: boolean
+  }
   icalURLs: PapillonIcalURL[],
   tabs: Tab[],
   subjects: {
@@ -53,6 +64,23 @@ export interface Personalization {
       emoji: string,
     }
   }
+}
+
+export interface Identity {
+  firstName?: string,
+  lastName?: string,
+  civility?: string,
+  boursier?: boolean,
+  ine?: string,
+  birthDate?: Date,
+  birthPlace?: string,
+  phone?: string[],
+  email?: string[],
+  address?: {
+    street?: string,
+    zipCode?: string,
+    city?: string,
+  },
 }
 
 export interface CurrentAccountStore {
@@ -77,7 +105,8 @@ export enum AccountService {
   Parcoursup,
   Onisep,
   Multi,
-  Izly
+  Izly,
+  Alise
 }
 
 /**
@@ -85,19 +114,20 @@ export enum AccountService {
  * for EVERY accounts stored.
  */
 interface BaseAccount {
-  localID: string
-  isExternal: false
+  localID: string;
+  isExternal: false;
 
-  name: string
-  className?: string
-  schoolName?: string
-  linkedExternalLocalIDs: string[]
+  name: string;
+  className?: string;
+  schoolName?: string;
+  linkedExternalLocalIDs: string[];
+  identity: Partial<Identity>;
 
   studentName: {
-    first: string
-    last: string
-  },
-  personalization: Partial<Personalization>
+    first: string;
+    last: string;
+  };
+  personalization: Partial<Personalization>;
 }
 
 interface BaseExternalAccount {
@@ -109,31 +139,37 @@ interface BaseExternalAccount {
 }
 
 export interface PronoteAccount extends BaseAccount {
-  service: AccountService.Pronote
+  service: AccountService.Pronote;
   instance?: pronote.SessionHandle;
 
   authentication: pronote.RefreshInformation & {
-    deviceUUID: string
-  }
-  identityProvider?: undefined
+    deviceUUID: string;
+  };
+  identityProvider?: undefined;
+  providers: string[];
+  serviceData: Record<string, unknown>;
 }
 
 export interface EcoleDirecteAccount extends BaseAccount {
-  service: AccountService.EcoleDirecte
-  instance: {}
+  service: AccountService.EcoleDirecte;
+  instance: {};
   authentication: {
-    session: PawdirecteSession
-    account: PawdirecteAccount
-  }
-  identityProvider?: undefined
+    session: PawdirecteSession;
+    account: PawdirecteAccount;
+  };
+  identityProvider?: undefined;
+  providers: string[];
+  serviceData: Record<string, unknown>;
 }
 
 export interface SkolengoAccount extends BaseAccount {
-  service: AccountService.Skolengo
-  instance?: ScolengoAPI.Skolengo
-  authentication: SkolengoAuthConfig
-  userInfo: ScolengoAPIUser
-  identityProvider?: undefined
+  service: AccountService.Skolengo;
+  instance?: ScolengoAPI.Skolengo;
+  authentication: SkolengoAuthConfig;
+  userInfo: ScolengoAPIUser;
+  identityProvider?: undefined;
+  providers: string[];
+  serviceData: Record<string, unknown>;
 }
 
 export interface MultiAccount extends BaseAccount {
@@ -144,25 +180,30 @@ export interface MultiAccount extends BaseAccount {
     refreshAuthToken: string
   }
   identityProvider?: undefined
+  providers: string[]
+  serviceData: Record<string, unknown>
 }
 
 export interface LocalAccount extends BaseAccount {
-  service: AccountService.Local
+  service: AccountService.Local;
 
   // Both are useless for local accounts.
-  instance: undefined | Record<string, unknown>
-  authentication: undefined | boolean
+  instance: undefined | Record<string, unknown>;
+  authentication: undefined | boolean;
 
   identityProvider: {
-    identifier: string
-    name: string,
-    rawData: Record<string, unknown>
-  }
+    identifier: string;
+    name: string;
+    rawData: Record<string, unknown>;
+  };
 
   credentials?: {
-    username: string
-    password: string
-  }
+    username: string;
+    password: string;
+  };
+
+  providers?: string[];
+  serviceData: Record<string, unknown>;
 }
 
 export interface TurboselfAccount extends BaseExternalAccount {
@@ -175,6 +216,19 @@ export interface TurboselfAccount extends BaseExternalAccount {
   }
 }
 
+export interface AliseAccount extends BaseExternalAccount {
+  service: AccountService.Alise
+  instance: undefined
+  authentication: {
+    session: AliseClient
+    schoolID: string
+    username: string
+    password: string
+    bookings: BookingDay[]
+    mealPrice: number
+  }
+}
+
 export interface ARDAccount extends BaseExternalAccount {
   service: AccountService.ARD
   instance?: ARDClient
@@ -183,6 +237,8 @@ export interface ARDAccount extends BaseExternalAccount {
     username: string
     password: string
     schoolID: string
+    balances: OnlinePayments
+    mealPrice: number
   }
 }
 
@@ -207,6 +263,7 @@ export type ExternalAccount = (
   | TurboselfAccount
   | ARDAccount
   | IzlyAccount
+  | AliseAccount
 );
 
 export type Account = (

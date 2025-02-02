@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NativeList, NativeItem, NativeListHeader } from "@/components/Global/NativeComponents";
 import { NativeIcon } from "@/components/Global/NativeComponents";
 import { NativeText } from "@/components/Global/NativeComponents";
-import AppJSON from "../../../app.json";
 import PackageJSON from "../../../package.json";
 import AboutContainerCard from "@/components/Settings/AboutContainerCard";
 import * as Linking from "expo-linking";
@@ -159,7 +158,19 @@ const SettingsAbout: Screen<"SettingsAbout"> = ({ navigation }) => {
               }}
             />}
           >
-            <NativeText variant="title">{contributor.login}</NativeText>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <NativeText variant="title">{contributor.login}</NativeText>
+              <Github size={18} color={colors.text} strokeWidth={2.5} />
+            </View>
+            <NativeText variant="subtitle">
+              {contributor.contributions} contribution{contributor.contributions > 1 ? "s" : ""}
+            </NativeText>
           </NativeItem>
         ))}
       </NativeList>
@@ -177,7 +188,7 @@ const SettingsAbout: Screen<"SettingsAbout"> = ({ navigation }) => {
             Version de l'application
           </NativeText>
           <NativeText variant="subtitle">
-            ver. {AppJSON.expo.version} {Constants.appOwnership === "expo" ? "(Expo Go)" : ""} {__DEV__ ? "(debug)" : ""}
+            ver. {PackageJSON.version} {Constants.appOwnership === "expo" ? "(Expo Go)" : ""} {__DEV__ ? "(debug)" : ""}
           </NativeText>
         </NativeItem>
         <NativeItem
@@ -187,12 +198,14 @@ const SettingsAbout: Screen<"SettingsAbout"> = ({ navigation }) => {
           <NativeText variant="title">
             Version des dépendances
           </NativeText>
-          {PackageJSON.dependencies["react-native"]  &&
-              <NativeText variant="subtitle">
-                {/* @ts-expect-error Le module expo est ajouté aux dépendances au moment du build. */}
-                RN : {PackageJSON.dependencies["react-native"].split("^")[1]} | Expo : {(PackageJSON.devDependencies.expo || PackageJSON.dependencies.expo).split("^")[1]}
-              </NativeText>
-          }
+          <NativeText variant="subtitle">
+            RN : {PackageJSON.dependencies["react-native"].split("^")[1]} |
+            Expo :{" "}
+            {(
+              PackageJSON.devDependencies.expo ||
+              PackageJSON.dependencies.expo
+            ).replace("^", "").replace("~", "")}
+          </NativeText>
         </NativeItem>
       </NativeList>
 

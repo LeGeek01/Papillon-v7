@@ -1,11 +1,12 @@
 import React, { useEffect } from "react";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { NativeItem, NativeList, NativeText } from "@/components/Global/NativeComponents";
 
 import Reanimated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import datasets from "@/consts/datasets.json";
 import InsetsBottomView from "@/components/Global/InsetsBottomView";
+import PapillonSpinner from "@/components/Global/PapillonSpinner";
 
 const SettingsDonorsList = () => {
   const [loading, setLoading] = React.useState(true);
@@ -60,6 +61,25 @@ const SettingsDonorsList = () => {
           </NativeText>
         </NativeItem>
       </NativeList>
+
+
+
+      {loading && (
+        <NativeList inline animated
+          entering={FadeIn}
+          exiting={FadeOut}
+        >
+          <NativeItem
+            leading={
+              <PapillonSpinner size={20} strokeWidth={3} />
+            }
+          >
+            <NativeText>
+              Chargement des donateurs...
+            </NativeText>
+          </NativeItem>
+        </NativeList>
+      )}
 
       {!loading && (
         <NativeList inline animated

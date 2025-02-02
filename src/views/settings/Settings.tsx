@@ -3,8 +3,7 @@ import React, { useEffect, useLayoutEffect, useState } from "react";
 import { Alert, Image, Platform, Text, View } from "react-native";
 import { useAccounts, useCurrentAccount } from "@/stores/account";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as WebBrowser from "expo-web-browser";
-import AppJSON from "../../../app.json";
+import PackageJSON from "../../../package.json";
 
 import Reanimated, {
   FadeIn,
@@ -30,9 +29,11 @@ import {
   Scroll,
   Settings as SettingsLucide,
   Sparkles,
+  SunMoon,
+  Smile,
   SwatchBook,
   WandSparkles,
-  X
+  X, HelpCircle
 } from "lucide-react-native";
 
 import { NativeIcon, NativeItem, NativeList, NativeListHeader, NativeText } from "@/components/Global/NativeComponents";
@@ -46,6 +47,8 @@ import { useFlagsStore } from "@/stores/flags";
 import { useAlert } from "@/providers/AlertProvider";
 import PapillonSpinner from "@/components/Global/PapillonSpinner";
 import { animPapillon } from "@/utils/ui/animations";
+import * as WebBrowser from "expo-web-browser";
+import { WebBrowserPresentationStyle } from "expo-web-browser";
 
 const Settings: Screen<"Settings"> = ({ route, navigation }) => {
   const theme = useTheme();
@@ -59,10 +62,10 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
 
   const removeAccount = useAccounts((store) => store.remove);
 
-  const openUrl = async (url: string) => {
-    await WebBrowser.openBrowserAsync(url, {
-      controlsColor: colors.primary,
-      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+  const openUrl = (url: string) => {
+    WebBrowser.openBrowserAsync(url, {
+      presentationStyle: WebBrowserPresentationStyle.FORM_SHEET,
+      controlsColor: theme.colors.primary,
     });
   };
 
@@ -106,15 +109,19 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
           icon: <Bell />,
           color: "#CF0029",
           label: "Notifications",
-          description: "Disponible prochainement",
           onPress: () => navigation.navigate("SettingsNotifications"),
-          disabled: !defined("enable_notifications"),
         },
         {
           icon: <Cable />,
           color: "#D79400",
           label: "Services externes",
           onPress: () => navigation.navigate("SettingsExternalServices"),
+        },
+        {
+          icon: <Smile />,
+          color: "#136B00",
+          label: "Réactions",
+          onPress: () => navigation.navigate("SettingsReactions"),
         },
       ],
     },
@@ -147,6 +154,12 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
               navigation.navigate("ColorSelector", { settings: true });
             }, 10);
           }
+        },
+        {
+          icon: <SunMoon />,
+          color: "#1e316a",
+          label: "Mode d'affichage",
+          onPress: () => navigation.navigate("SettingsApparence"),
         },
       ],
     },
@@ -187,8 +200,8 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
         {
           icon: <WandSparkles />,
           color: "#58A3C3",
-          label: "Papillon Magic",
-          description: "Beta",
+          label: "Papillon Magic (Bêta)",
+          description: "Fonctionnalités intelligentes",
           onPress: () => navigation.navigate("SettingsMagic"),
         },
       ],
@@ -202,6 +215,12 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
           color: "#c75110",
           label: "Quoi de neuf ?",
           onPress: () => navigation.navigate("ChangelogScreen"),
+        },
+        {
+          icon: <HelpCircle />,
+          color: "#0E7CCB",
+          label: "Besoin d'aide ?",
+          onPress: () => openUrl("https://support.papillon.bzh/"),
         },
         {
           icon: <Info />,
@@ -219,7 +238,7 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
           label: "Se déconnecter",
           onPress: () => {
             if (Platform.OS === "ios") {
-              Alert.alert("Se déconnecter", "Êtes-vous sûr de vouloir vous déconnecter ?", [
+              Alert.alert("Se déconnecter", "Es-tu sûr de vouloir te déconnecter ?", [
                 {
                   text: "Annuler",
                   style: "cancel",
@@ -239,7 +258,7 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
             } else {
               showAlert({
                 title: "Se déconnecter",
-                message: "Êtes-vous sûr de vouloir vous déconnecter ?",
+                message: "Es-tu sûr de vouloir te déconnecter ?",
                 actions: [
                   {
                     title: "Annuler",
@@ -268,6 +287,17 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
       ]
     }
   ];
+
+  if (Platform.OS === "android") {
+    tabs[3].tabs.push({
+      icon: <HandCoins />,
+      color: "#f0a500",
+      label: "Soutenir Papillon",
+      onPress: () => openUrl("https://papillon.bzh/donate"),
+      android: true,
+      description: ""
+    });
+  }
 
   const translationY = useSharedValue(0);
   const [scrolled, setScrolled] = useState(false);
@@ -347,10 +377,10 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
         {tabs.map((tab, index) => (
           <View key={index}>
             {tab.label &&
-          <NativeListHeader
-            key={index}
-            label={tab.label}
-          />
+              <NativeListHeader
+                key={index}
+                label={tab.label}
+              />
             }
             <NativeList>
               {tab.tabs.map((subtab, index) => (
@@ -383,7 +413,7 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
           </View>
         ))}
 
-        {devModeEnabled == true && (
+        {devModeEnabled && (
           <View>
             <NativeListHeader label={"Développeur"}/>
             <NativeList>
@@ -416,7 +446,7 @@ const Settings: Screen<"Settings"> = ({ route, navigation }) => {
             marginTop: 24,
           }}
         >
-          version {AppJSON.expo.version} {Platform.OS} {"\n"}
+          version {PackageJSON.version} {Platform.OS} {__DEV__ ? "(développeur)" : ""} {"\n"}
           fabriqué avec ❤️ par les contributeurs Papillon
         </Text>
       </Reanimated.ScrollView>

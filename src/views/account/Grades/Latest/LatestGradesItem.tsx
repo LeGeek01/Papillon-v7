@@ -1,11 +1,11 @@
 import { NativeList, NativeText } from "@/components/Global/NativeComponents";
 import { getSubjectData } from "@/services/shared/Subject";
-import { animPapillon } from "@/utils/ui/animations";
 import React, { useEffect, useState } from "react";
 import { View } from "react-native";
 import { PressableScale } from "react-native-pressable-scale";
-import { FadeInRight, FadeOutLeft } from "react-native-reanimated";
 import type { Grade } from "@/services/shared/Grade";
+import { FadeInRight, FadeOutLeft } from "react-native-reanimated";
+import { anim2Papillon } from "@/utils/ui/animations";
 
 type GradeLatestItemProps = {
   grade: Grade;
@@ -42,11 +42,11 @@ const GradesLatestItem: React.FC<GradeLatestItemProps> = ({
       <NativeList
         animated
         key={grade.id}
-        entering={animPapillon(FadeInRight).delay(100 * i + 100)}
-        exiting={animPapillon(FadeOutLeft).delay(100 * i)}
         style={{
           width: 230,
         }}
+        entering={i < 3 && anim2Papillon(FadeInRight).duration(300).delay(i * 50)}
+        exiting={i < 3 && anim2Papillon(FadeOutLeft).duration(100).delay(i * 50)}
       >
         <View
           style={{
@@ -143,7 +143,7 @@ const GradesLatestItem: React.FC<GradeLatestItemProps> = ({
                 marginBottom: -6,
               }}
             >
-              /{parseFloat(grade.outOf.value?.toString() || "20").toFixed(0)}
+              /{parseFloat(grade.outOf.value?.toString() || "20")}
             </NativeText>
           </View>
         </View>

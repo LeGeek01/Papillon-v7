@@ -4,29 +4,27 @@ import {
   NativeText,
 } from "@/components/Global/NativeComponents";
 import { getSubjectData } from "@/services/shared/Subject";
-import { animPapillon } from "@/utils/ui/animations";
 import React, { useEffect, useState } from "react";
-import { View } from "react-native";
-import Reanimated, {
-  FadeInDown,
-  FadeInUp,
-  FadeOutUp,
-} from "react-native-reanimated";
+import { FlatList, View } from "react-native";
+import Reanimated, { FadeIn, FadeInDown, FadeOut, FadeOutUp } from "react-native-reanimated";
 import SubjectTitle from "./SubjectTitle";
 import { type Grade, type GradesPerSubject } from "@/services/shared/Grade";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteParameters } from "@/router/helpers/types";
+import { anim2Papillon } from "@/utils/ui/animations";
 
 interface SubjectItemProps {
   subject: GradesPerSubject;
   allGrades: Grade[];
   navigation: NativeStackNavigationProp<RouteParameters, keyof RouteParameters>;
+  index?: number;
 }
 
 const SubjectItem: React.FC<SubjectItemProps> = ({
   subject,
   allGrades,
   navigation,
+  index,
 }) => {
   const [subjectData, setSubjectData] = useState({
     color: "#888888",
@@ -43,11 +41,16 @@ const SubjectItem: React.FC<SubjectItemProps> = ({
     fetchSubjectData();
   }, [subject.average.subjectName]);
 
+  if (!subjectData) {
+    return null;
+  }
+
   return (
     <NativeList
       animated
-      entering={animPapillon(FadeInUp)}
-      exiting={animPapillon(FadeOutUp)}
+      key={subject.average.subjectName+"subjectItem"}
+      entering={index < 3 && anim2Papillon(FadeInDown).duration(300).delay(80 * index)}
+      exiting={index < 3 && anim2Papillon(FadeOutUp).duration(100).delay(80 * index)}
     >
       <SubjectTitle
         navigation={navigation}
@@ -56,76 +59,105 @@ const SubjectItem: React.FC<SubjectItemProps> = ({
         allGrades={allGrades}
       />
 
-      {subject.grades.map((grade: Grade, index: number) => (
-        <Reanimated.View
-          key={grade.id + index}
-          entering={animPapillon(FadeInDown).delay(50 * index + 100)}
-          exiting={animPapillon(FadeOutUp).delay(50 * index)}
+      <FlatList
+        data={subject.grades}
+        renderItem={({ item, index }) => (
+          <SubjectGradeItem
+            subject={subject}
+            grade={item}
+            index={index}
+            onPress={() => {
+              navigation.navigate("GradeDocument", { grade:item, allGrades });
+            }}
+          />
+        )}
+        keyExtractor={(item) => {
+          if (!item.description) {
+            return item.id + "_" + Math.random();
+          }
+          return item.id;
+        }}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        initialNumToRender={8}
+        windowSize={5}
+      />
+    </NativeList>
+  );
+};
+
+interface SubjectGradeItemProps {
+  subject: GradesPerSubject;
+  grade: Grade;
+  index: number;
+  onPress: () => void;
+}
+
+const SubjectGradeItem: React.FC<SubjectGradeItemProps> = ({ subject, grade, index, onPress }) => {
+  return (
+    <Reanimated.View
+      entering={FadeIn.duration(100)}
+      exiting={FadeOut.duration(100)}
+      key={grade.id + index + "subjectlistname"}
+    >
+      <NativeItem
+        separator={index < subject.grades.length - 1}
+        chevron={false}
+        onPress={() => onPress()}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+          }}
         >
-          <NativeItem
-            separator={index < subject.grades.length - 1}
-            chevron={false}
-            onPress={() =>
-              navigation.navigate("GradeDocument", { grade, allGrades })
-            }
+          <View
+            style={{
+              flex: 1,
+            }}
           >
-            <View
+            <NativeText variant="default" numberOfLines={1}>
+              {grade.description || "Note sans titre"}
+            </NativeText>
+            <NativeText variant="subtitle" numberOfLines={1}>
+              {new Date(grade.timestamp).toLocaleDateString("fr-FR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </NativeText>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-end",
+            }}
+          >
+            <NativeText
               style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 16,
+                fontSize: 17,
+                lineHeight: 20,
+                fontFamily: "medium",
               }}
             >
-              <View
-                style={{
-                  flex: 1,
-                }}
-              >
-                <NativeText variant="default" numberOfLines={1}>
-                  {grade.description || "Note sans titre"}
-                </NativeText>
-                <NativeText variant="subtitle" numberOfLines={1}>
-                  {new Date(grade.timestamp).toLocaleDateString("fr-FR", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </NativeText>
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "flex-end",
-                }}
-              >
-                <NativeText
-                  style={{
-                    fontSize: 17,
-                    lineHeight: 20,
-                    fontFamily: "medium",
-                  }}
-                >
-                  {typeof grade.student.value === "number"
-                    ? grade.student.value.toFixed(2)
-                    : "N. not"}
-                </NativeText>
-                <NativeText
-                  style={{
-                    fontSize: 15,
-                    lineHeight: 15,
-                    opacity: 0.6,
-                  }}
-                >
-                  /{grade.outOf.value?.toFixed(0) ?? "??"}
-                </NativeText>
-              </View>
-            </View>
-          </NativeItem>
-        </Reanimated.View>
-      ))}
-    </NativeList>
+              {grade.student.disabled ? (grade.student.status === null ? "N. Not" : grade.student.status) : grade.student.value?.toFixed(2)}
+            </NativeText>
+            <NativeText
+              style={{
+                fontSize: 15,
+                lineHeight: 15,
+                opacity: 0.6,
+              }}
+            >
+              /{grade.outOf.value?.toFixed(0) ?? "??"}
+            </NativeText>
+          </View>
+        </View>
+      </NativeItem>
+    </Reanimated.View>
   );
 };
 
