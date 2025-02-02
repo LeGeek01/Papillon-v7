@@ -28,6 +28,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# Include android certificates
+!assets/certificates/*.pem
+
 # local env files
 .env*.local
 
